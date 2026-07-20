@@ -33,7 +33,7 @@ jobs:
             gcc-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu
 
-      - - name: Build kernel
+      - name: Build kernel
         run: |
           mkdir -p out
 
