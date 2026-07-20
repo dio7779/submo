@@ -14,6 +14,13 @@ jobs:
           ref: air-t-oss
           fetch-depth: 1
 
+      - name: Fetch missing build tooling (kernel/build)
+        run: |
+          git clone --depth=1 -b android13-5.15 \
+            https://android.googlesource.com/kernel/build build \
+            || git clone --depth=1 \
+            https://android.googlesource.com/kernel/build build
+
       - name: Install build deps
         run: |
           sudo apt-get update
@@ -26,7 +33,6 @@ jobs:
         run: |
           export BUILD_CONFIG=build.config.gki
           build/build.sh 2>&1 | tee build.log
-
       - name: Locate and upload vmlinux
         run: |
           find out -name vmlinux -exec cp {} ./vmlinux \;
