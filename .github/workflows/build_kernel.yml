@@ -21,6 +21,7 @@ jobs:
           ref: air-t-oss
           fetch-depth: 1
 
+    
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -37,6 +38,7 @@ jobs:
         run: |
           mkdir -p out
 
+          # 生成初始配置
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -52,6 +54,7 @@ jobs:
             -e LTO_NONE \
             -d IKHEADERS
 
+          # 开始正式编译
           set -o pipefail
           make O=out ARCH=arm64 \
             CC=clang \
@@ -64,7 +67,6 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             -j$(nproc) 2>&1 | tee build.log
-
       - name: Upload vmlinux
         uses: actions/upload-artifact@v4
         with:
