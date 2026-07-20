@@ -38,7 +38,6 @@ jobs:
         run: |
           mkdir -p out
 
-          # 生成初始配置
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -46,15 +45,16 @@ jobs:
             LD=ld.lld \
             gki_defconfig
 
-          # 关掉 LTO 避免 OOM，关掉 IKHEADERS 避免找不到 tools/build/cpio
+          # 在这里追加禁用 NFC 相关的配置
           scripts/config --file out/.config \
             -d LTO_CLANG \
             -d LTO_CLANG_THIN \
             -d LTO_CLANG_FULL \
             -e LTO_NONE \
-            -d IKHEADERS
+            -d IKHEADERS \
+            -d NFC_PN557 \
+            -d NFC_NXP_NCI
 
-          # 开始正式编译
           set -o pipefail
           make O=out ARCH=arm64 \
             CC=clang \
