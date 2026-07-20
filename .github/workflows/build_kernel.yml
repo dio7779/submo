@@ -33,23 +33,10 @@ jobs:
             gcc-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu
 
-      - name: Build kernel
+      - - name: Build kernel
         run: |
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CC=clang
-          export CLANG_TRIPLE=aarch64-linux-gnu-
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export LD=ld.lld
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-
           mkdir -p out
 
-          # 生成 .config
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -57,13 +44,15 @@ jobs:
             LD=ld.lld \
             gki_defconfig
 
-          # 关掉 LTO（GKI 默认开 LTO，会大幅增加编译时间和内存，CI 上容易 OOM）
+          # 关掉 LTO 避免 OOM，关掉 IKHEADERS 避免找不到 tools/build/cpio
           scripts/config --file out/.config \
             -d LTO_CLANG \
             -d LTO_CLANG_THIN \
             -d LTO_CLANG_FULL \
-            -e LTO_NONE
+            -e LTO_NONE \
+            -d IKHEADERS
 
+          set -o pipefail
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
