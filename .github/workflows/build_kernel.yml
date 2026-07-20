@@ -21,7 +21,6 @@ jobs:
           ref: air-t-oss
           fetch-depth: 1
 
-    
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -38,6 +37,9 @@ jobs:
         run: |
           mkdir -p out
 
+          # 【修复 2】提前修复 fuse.h 缺少 <linux/types.h> 导致的头文件测试报错
+          sed -i '1i #include <linux/types.h>' include/uapi/linux/fuse.h
+
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -45,7 +47,7 @@ jobs:
             LD=ld.lld \
             gki_defconfig
 
-          # 在这里追加禁用 NFC 相关的配置
+          # 在这里追加禁用 NFC 和 LTO 等相关的配置
           scripts/config --file out/.config \
             -d LTO_CLANG \
             -d LTO_CLANG_THIN \
@@ -54,6 +56,15 @@ jobs:
             -d IKHEADERS \
             -d NFC_PN557 \
             -d NFC_NXP_NCI
+
+          # 【修复 1】运行 olddefconfig。
+          # 因为上面手动修改了 config，会引发依赖变化。这一步自动应用默认值，避免 CI/CD 环境下弹出 Y/n 交互界面导致构建中断。
+          make O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LD=ld.lld \
+            olddefconfig
 
           set -o pipefail
           make O=out ARCH=arm64 \
@@ -67,6 +78,7 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             -j$(nproc) 2>&1 | tee build.log
+
       - name: Upload vmlinux
         uses: actions/upload-artifact@v4
         with:
