@@ -6,7 +6,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+                      "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android
+          df -h
+
       - name: Checkout kernel source
         uses: actions/checkout@v4
         with:
@@ -14,40 +21,76 @@ jobs:
           ref: air-t-oss
           fetch-depth: 1
 
-      - name: Fetch missing build tooling (kernel/build)
-        run: |
-          git clone --depth=1 -b android13-5.15 \
-            https://android.googlesource.com/kernel/build build \
-            || git clone --depth=1 \
-            https://android.googlesource.com/kernel/build build
-
-      - name: Install build deps
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex \
-            libssl-dev libncurses-dev libelf-dev git curl \
-            device-tree-compiler python3 rsync libgcc1 \
-            lib32z1 libc6-dev-i386 gcc-multilib
+          sudo apt-get install -y \
+            build-essential bc bison flex \
+            libssl-dev libncurses-dev libelf-dev \
+            git curl rsync python3 \
+            device-tree-compiler \
+            clang lld llvm \
+            gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu
 
-      - name: Run build.sh
+      - name: Build kernel
         run: |
-          export BUILD_CONFIG=build.config.gki
-          build/build.sh 2>&1 | tee build.log
-      - name: Locate and upload vmlinux
-        run: |
-          find out -name vmlinux -exec cp {} ./vmlinux \;
-          ls -la ./vmlinux
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CC=clang
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
 
-      - uses: actions/upload-artifact@v4
+          mkdir -p out
+
+          # 生成 .config
+          make O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LD=ld.lld \
+            gki_defconfig
+
+          # 关掉 LTO（GKI 默认开 LTO，会大幅增加编译时间和内存，CI 上容易 OOM）
+          scripts/config --file out/.config \
+            -d LTO_CLANG \
+            -d LTO_CLANG_THIN \
+            -d LTO_CLANG_FULL \
+            -e LTO_NONE
+
+          make O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            -j$(nproc) 2>&1 | tee build.log
+
+      - name: Upload vmlinux
+        uses: actions/upload-artifact@v4
         with:
           name: vmlinux
-          path: vmlinux
+          path: out/vmlinux
 
-      - name: Upload full dist dir + build log (for debugging)
+      - name: Upload Image (boot kernel binary)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image
+          path: out/arch/arm64/boot/Image
+
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-dist-and-log
-          path: |
-            out/**/dist/**
-            build.log
+          name: build-log
+          path: build.log
