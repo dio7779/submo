@@ -1,1 +1,47 @@
+name: Build vmlinux (air GKI)
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          repository: MiCode/Xiaomi_Kernel_OpenSource
+          ref: air-t-oss
+          fetch-depth: 1
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex \
+            libssl-dev libncurses-dev libelf-dev git curl \
+            device-tree-compiler python3 rsync libgcc1 \
+            lib32z1 libc6-dev-i386 gcc-multilib
+
+      - name: Run build.sh
+        run: |
+          export BUILD_CONFIG=build.config.gki
+          build/build.sh 2>&1 | tee build.log
+
+      - name: Locate and upload vmlinux
+        run: |
+          find out -name vmlinux -exec cp {} ./vmlinux \;
+          ls -la ./vmlinux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vmlinux
+          path: vmlinux
+
+      - name: Upload full dist dir + build log (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-dist-and-log
+          path: |
+            out/**/dist/**
+            build.log
