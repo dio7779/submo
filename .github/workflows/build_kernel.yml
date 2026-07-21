@@ -59,6 +59,10 @@ jobs:
           # 直接删除源码目录可以彻底、稳定地阻止该驱动被编译。
           rm -rf drivers/nfc/pn557
 
+          # 同步移除 Kconfig 里对已删除目录的 source 引用，否则 gki_defconfig 会报
+          # "can't open file drivers/nfc/pn557/Kconfig" 而直接失败
+          sed -i '\#source "drivers/nfc/pn557/Kconfig"#d' drivers/nfc/Kconfig
+
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
