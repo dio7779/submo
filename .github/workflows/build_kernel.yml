@@ -45,10 +45,6 @@ jobs:
           if [ -f "drivers/input/touchscreen/lct_tp/Kconfig" ]; then
             sed -i '1s/^\xEF\xBB\xBF//' drivers/input/touchscreen/lct_tp/Kconfig
           fi
-          # 2. 修复文件末尾没有换行符的警告
-          if [ -f "drivers/nfc/pn557/Kconfig" ]; then
-            echo "" >> drivers/nfc/pn557/Kconfig
-          fi
 
           # 【修复 3】彻底移除 pn557 NFC 驱动源码目录。
           # 该驱动依赖厂商自定义的 NFC_PLATFORM_xxx 宏，在通用 gki_defconfig 下
@@ -62,6 +58,16 @@ jobs:
           # 同步移除 Kconfig 里对已删除目录的 source 引用，否则 gki_defconfig 会报
           # "can't open file drivers/nfc/pn557/Kconfig" 而直接失败
           sed -i '\#source "drivers/nfc/pn557/Kconfig"#d' drivers/nfc/Kconfig
+
+          # 同步移除 Makefile 里对 pn557 子目录的引用。
+          # 如果某个 vendor defconfig 片段里残留了 CONFIG_NFC_PN557=y，
+          # 即使符号已从 Kconfig 树中移除、后面也用 scripts/config -d 关闭了它，
+          # kbuild 仍可能因为孤儿配置项残留而尝试进入已删除的 pn557 目录，
+          # 直接从 Makefile 里删掉这一行才能彻底杜绝。
+          sed -i '/pn557/d' drivers/nfc/Makefile
+
+          # 调试用：确认两处引用都已清除，方便在日志里直接确认结果
+          grep -n pn557 drivers/nfc/Kconfig drivers/nfc/Makefile || echo "pn557 引用已彻底清除"
 
           make O=out ARCH=arm64 \
             CC=clang \
@@ -120,3 +126,4 @@ jobs:
         with:
           name: build-log
           path: build.log
+
