@@ -31,7 +31,8 @@ jobs:
             device-tree-compiler \
             clang lld llvm \
             gcc-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu
+            binutils-aarch64-linux-gnu \
+            dwarves
 
       - name: Build kernel
         run: |
@@ -151,5 +152,4 @@ jobs:
         with:
           name: build-log
           path: build.log
-
 
