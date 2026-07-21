@@ -40,6 +40,16 @@ jobs:
           # 【修复 2】提前修复 fuse.h 缺少 <linux/types.h> 导致的头文件测试报错
           sed -i '1i #include <linux/types.h>' include/uapi/linux/fuse.h
 
+          # 【新增修复】清理 Kconfig 警告（自动去除 BOM 头并补充文件末尾的换行符）
+          # 1. 修复不支持的不可见字符 (移除 UTF-8 BOM 头)
+          if [ -f "drivers/input/touchscreen/lct_tp/Kconfig" ]; then
+            sed -i '1s/^\xEF\xBB\xBF//' drivers/input/touchscreen/lct_tp/Kconfig
+          fi
+          # 2. 修复文件末尾没有换行符的警告
+          if [ -f "drivers/nfc/pn557/Kconfig" ]; then
+            echo "" >> drivers/nfc/pn557/Kconfig
+          fi
+
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
