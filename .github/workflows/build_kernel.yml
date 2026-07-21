@@ -40,8 +40,8 @@ jobs:
           # 【修复 2】提前修复 fuse.h 缺少 <linux/types.h> 导致的头文件测试报错
           sed -i '1i #include <linux/types.h>' include/uapi/linux/fuse.h
 
-          # 【新增修复】清理 Kconfig 警告（自动去除 BOM 头并补充文件末尾的换行符）
-          # 1. 修复不支持的不可见字符 (移除 UTF-8 BOM 头)
+          # 【新增修复】清理 Kconfig 警告（自动去除 BOM 头）
+          # 修复不支持的不可见字符 (移除 UTF-8 BOM 头)
           if [ -f "drivers/input/touchscreen/lct_tp/Kconfig" ]; then
             sed -i '1s/^\xEF\xBB\xBF//' drivers/input/touchscreen/lct_tp/Kconfig
           fi
@@ -66,8 +66,24 @@ jobs:
           # 直接从 Makefile 里删掉这一行才能彻底杜绝。
           sed -i '/pn557/d' drivers/nfc/Makefile
 
-          # 调试用：确认两处引用都已清除，方便在日志里直接确认结果
+          # 调试用：确认两处引用都已清除
           grep -n pn557 drivers/nfc/Kconfig drivers/nfc/Makefile || echo "pn557 引用已彻底清除"
+
+          # 【修复 4】彻底移除 nt36528_spi 触摸屏驱动源码目录。
+          # 该驱动依赖联发科(MediaTek)私有的 SCP 协处理器头文件 scp.h，
+          # 该头文件属于厂商未开源的 drivers/misc/mediatek/scp 部分，
+          # 在这个开源内核树里不存在，导致编译报错：
+          # fatal error: 'scp.h' file not found
+          # 处理方式与 pn557 相同：直接删除源码目录，并清理 Kconfig/Makefile
+          # 里所有对它的引用，避免孤儿 CONFIG 残留导致 kbuild 仍尝试进入该目录。
+          rm -rf drivers/input/touchscreen/nt36528_spi
+
+          sed -i '/nt36528_spi/d' drivers/input/touchscreen/Kconfig
+          sed -i '/nt36528_spi/d' drivers/input/touchscreen/Makefile
+
+          # 调试用：确认引用已清除
+          grep -n nt36528_spi drivers/input/touchscreen/Kconfig drivers/input/touchscreen/Makefile \
+            || echo "nt36528_spi 引用已彻底清除"
 
           make O=out ARCH=arm64 \
             CC=clang \
