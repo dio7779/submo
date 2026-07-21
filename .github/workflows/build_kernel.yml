@@ -50,6 +50,15 @@ jobs:
             echo "" >> drivers/nfc/pn557/Kconfig
           fi
 
+          # 【修复 3】彻底移除 pn557 NFC 驱动源码目录。
+          # 该驱动依赖厂商自定义的 NFC_PLATFORM_xxx 宏，在通用 gki_defconfig 下
+          # 这些宏未被定义，导致 -Werror,-Wimplicit-function-declaration 报错。
+          # 仅通过 scripts/config -d NFC_PN557 关闭该选项并不可靠：后续的
+          # olddefconfig 会重新计算依赖关系，如果有其他配置 select/default
+          # 到 NFC_PN557，该选项会被重新打开，导致驱动仍然被编译进内核。
+          # 直接删除源码目录可以彻底、稳定地阻止该驱动被编译。
+          rm -rf drivers/nfc/pn557
+
           make O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
