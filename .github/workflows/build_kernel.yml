@@ -69,21 +69,30 @@ jobs:
           # 调试用：确认两处引用都已清除
           grep -n pn557 drivers/nfc/Kconfig drivers/nfc/Makefile || echo "pn557 引用已彻底清除"
 
-          # 【修复 4】彻底移除 nt36528_spi 触摸屏驱动源码目录。
-          # 该驱动依赖联发科(MediaTek)私有的 SCP 协处理器头文件 scp.h，
-          # 该头文件属于厂商未开源的 drivers/misc/mediatek/scp 部分，
-          # 在这个开源内核树里不存在，导致编译报错：
-          # fatal error: 'scp.h' file not found
-          # 处理方式与 pn557 相同：直接删除源码目录，并清理 Kconfig/Makefile
-          # 里所有对它的引用，避免孤儿 CONFIG 残留导致 kbuild 仍尝试进入该目录。
-          rm -rf drivers/input/touchscreen/nt36528_spi
+          # 【修复 4】批量移除所有依赖联发科(MediaTek)私有 SCP 协处理器头文件
+          # scp.h 的驱动源码目录。scp.h 属于厂商未开源的
+          # drivers/misc/mediatek/scp 部分，在这个开源内核树里不存在，
+          # 会导致编译报错：fatal error: 'scp.h' file not found
+          # （目前已知受影响的至少有 nt36528_spi、ft8057p_spi 两个触摸屏驱动，
+          # 不排除还有其他同类驱动）。
+          # 与其针对每个驱动逐一手动加 rm -rf，这里改为自动扫描整个 drivers/
+          # 目录，找出所有引用了 <scp.h> 的 .c 文件，取其所在目录整体删除，
+          # 并清理该目录所在上级 Kconfig/Makefile 里对应的引用行，防止
+          # 孤儿 CONFIG 残留导致 kbuild 仍尝试进入已删除的目录。
+          for f in $(grep -rl '#include <scp\.h>' drivers --include='*.c'); do
+            d=$(dirname "$f")
+            name=$(basename "$d")
+            parent=$(dirname "$d")
+            echo ">>> 移除依赖 scp.h 的驱动目录: $d"
+            rm -rf "$d"
+            [ -f "$parent/Kconfig" ]  && sed -i "/${name}/d" "$parent/Kconfig"
+            [ -f "$parent/Makefile" ] && sed -i "/${name}/d" "$parent/Makefile"
+          done
 
-          sed -i '/nt36528_spi/d' drivers/input/touchscreen/Kconfig
-          sed -i '/nt36528_spi/d' drivers/input/touchscreen/Makefile
-
-          # 调试用：确认引用已清除
-          grep -n nt36528_spi drivers/input/touchscreen/Kconfig drivers/input/touchscreen/Makefile \
-            || echo "nt36528_spi 引用已彻底清除"
+          # 调试用：确认整棵 drivers 树里已经没有残留的 scp.h 引用
+          grep -rn '#include <scp\.h>' drivers --include='*.c' \
+            && echo "警告：仍有文件引用 scp.h，上面的清理可能不完整" \
+            || echo "scp.h 相关驱动引用已彻底清除"
 
           make O=out ARCH=arm64 \
             CC=clang \
@@ -142,4 +151,5 @@ jobs:
         with:
           name: build-log
           path: build.log
+
 
